@@ -29,8 +29,8 @@ An intelligent, automated web data scraper built with Electron and Node.js that 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/intelligent-web-data-scraper.git
-cd intelligent-web-data-scraper
+git clone https://github.com/nibertinvestments/Working-Data-Scraper.git
+cd Working-Data-Scraper
 ```
 
 ### 2. Install Dependencies
