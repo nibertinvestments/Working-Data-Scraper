@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Scraper</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Data Scraper</h1>
+            <p class="subtitle">Automatically collect contact information while browsing</p>
+        </header>
+
+        <main>
+            <div class="control-panel">
+                <div class="scraping-controls">
+                    <button id="start-btn" class="btn btn-primary">
+                        <span class="btn-icon">▶️</span>
+                        Start Scraping
+                    </button>
+                    <button id="stop-btn" class="btn btn-secondary" disabled>
+                        <span class="btn-icon">⏹️</span>
+                        Stop Scraping
+                    </button>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-indicator">
+                        <div id="status-dot" class="status-dot inactive"></div>
+                        <span id="status-text">Ready to start</span>
+                    </div>
+                    <div id="stats-panel" class="stats-panel hidden">
+                        <div class="stat-item">
+                            <span class="stat-label">Sites Scraped:</span>
+                            <span id="sites-count" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Contacts Found:</span>
+                            <span id="contacts-count" class="stat-value">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-section">
+                <div class="section-header">
+                    <h3>Recent Contacts</h3>
+                    <div class="export-buttons">
+                        <button id="export-csv-btn" class="btn btn-outline">Export CSV</button>
+                        <button id="export-sheets-btn" class="btn btn-outline">Export to Sheets</button>
+                    </div>
+                </div>
+                
+                <div class="data-table-container">
+                    <table id="data-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Website</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Name</th>
+                                <th>Time Found</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body">
+                            <tr class="empty-state">
+                                <td colspan="5">No data collected yet. Click "Start Scraping" to begin.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="footer-actions">
+                <button id="settings-btn" class="btn btn-text">⚙️ Settings</button>
+                <button id="clear-data-btn" class="btn btn-text">🗑️ Clear Data</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button id="close-settings" class="close-btn">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>Scraping Options</h4>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="extract-emails" checked>
+                        Extract Email Addresses
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="extract-phones" checked>
+                        Extract Phone Numbers
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="extract-names" checked>
+                        Extract Names
+                    </label>
+                    
+                    <div class="input-group">
+                        <label for="scraping-delay">Delay Between Sites (ms):</label>
+                        <input type="number" id="scraping-delay" min="1000" max="10000" value="2000">
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>Google Sheets Integration</h4>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enable-sheets">
+                        Enable Google Sheets Export
+                    </label>
+                    
+                    <div class="input-group">
+                        <label for="spreadsheet-id">Spreadsheet ID:</label>
+                        <input type="text" id="spreadsheet-id" placeholder="Enter Google Sheets ID">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="credentials-file">Credentials File:</label>
+                        <input type="file" id="credentials-file" accept=".json">
+                        <small>Upload your Google Sheets API credentials JSON file</small>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>CSV Export</h4>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto-export-csv" checked>
+                        Auto-export to CSV
+                    </label>
+                    
+                    <div class="input-group">
+                        <label for="csv-path">CSV File Path:</label>
+                        <input type="text" id="csv-path" placeholder="Path to save CSV file">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="save-settings" class="btn btn-primary">Save Settings</button>
+                <button id="cancel-settings" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading/Status Messages -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

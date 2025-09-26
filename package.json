@@ -1,0 +1,72 @@
+{
+  "name": "data-scraper",
+  "version": "1.0.0",
+  "description": "Desktop application for automatically scraping contact information while browsing",
+  "main": "src/main-progressive.js",
+  "type": "module",
+  "scripts": {
+    "start": "npx electron .",
+    "start-simple": "npx electron src/main-simple.js",
+    "start-debug": "npx electron src/main-debug.js",
+    "start-original": "npx electron src/main.js",
+    "dev": "npx electron . --dev",
+    "test": "node test-components.js",
+    "build": "electron-builder",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "setup": "npm install && node test-components.js",
+    "clean": "rimraf dist node_modules && npm install"
+  },
+  "keywords": [
+    "data-scraper",
+    "contact-extraction",
+    "web-scraping",
+    "electron",
+    "automation"
+  ],
+  "author": "Josh",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^38.1.2",
+    "electron-builder": "^24.0.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0"
+  },
+  "dependencies": {
+    "active-win": "^8.0.0",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
+    "chrome-remote-interface": "^0.33.3",
+    "csv-parser": "^3.2.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^17.2.2",
+    "electron-store": "^8.2.0",
+    "googleapis": "^128.0.0",
+    "papaparse": "^5.5.3",
+    "puppeteer": "^24.22.3",
+    "sqlite3": "^5.1.7"
+  },
+  "build": {
+    "appId": "com.josh.data-scraper",
+    "productName": "Data Scraper",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  }
+}

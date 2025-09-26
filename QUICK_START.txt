@@ -1,0 +1,52 @@
+=====================================================
+🔍 DATA SCRAPER - QUICK REFERENCE
+=====================================================
+
+📍 LOCATION: c:\Users\Josh\Desktop\Github\Data Scraper
+
+🚀 START APPLICATION:
+   npm start
+
+📊 YOUR GOOGLE SHEETS:
+   https://docs.google.com/spreadsheets/d/15rFNiDyUtp89RijmXNJidzon5RUpgdCalkU1JxeUNJY/edit
+
+⚙️ SETUP GOOGLE SHEETS:
+   1. Follow: credentials/README.md
+   2. Add: credentials/google-sheets-credentials.json
+   3. Share spreadsheet with service account
+
+💾 DATA LOCATIONS:
+   📁 Local Database: data/contacts.db  
+   📁 CSV Exports: exports/contacts.csv
+   📁 Settings: .env
+
+🎯 HOW IT WORKS:
+   1. Click "Start Scraping"
+   2. Browse websites normally  
+   3. App automatically collects contact info
+   4. Data appears in app table
+   5. Click "Stop Scraping" when done
+
+📧 EXTRACTS:
+   ✓ Email addresses
+   ✓ Phone numbers  
+   ✓ Contact names
+   ✓ Business information
+
+🔧 COMMANDS:
+   npm start        # Launch app
+   npm run dev      # Debug mode
+   npm test         # Test components  
+   npm run setup    # Full setup
+
+🛡️ PRIVACY:
+   ✓ All data stays local
+   ✓ No tracking/analytics
+   ✓ Export only when you choose
+   ✓ Respects rate limits
+
+📞 SUPPORT:
+   Check SETUP_COMPLETE.md for full guide
+   All code is documented and modular
+
+=====================================================
