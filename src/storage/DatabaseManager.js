@@ -128,12 +128,95 @@ export class DatabaseManager {
             )
         `);
 
+        // Addresses table (NEW)
+        await this.dbRun(`
+            CREATE TABLE IF NOT EXISTS addresses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                address TEXT NOT NULL,
+                type TEXT,
+                found_at DATETIME,
+                FOREIGN KEY (contact_id) REFERENCES contacts (id),
+                UNIQUE(contact_id, address)
+            )
+        `);
+
+        // Social media table (NEW)
+        await this.dbRun(`
+            CREATE TABLE IF NOT EXISTS social_media (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                platform TEXT NOT NULL,
+                url TEXT NOT NULL,
+                found_at DATETIME,
+                FOREIGN KEY (contact_id) REFERENCES contacts (id),
+                UNIQUE(contact_id, platform)
+            )
+        `);
+
+        // Company info table (NEW)
+        await this.dbRun(`
+            CREATE TABLE IF NOT EXISTS company_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                company_name TEXT,
+                industry TEXT,
+                founded_year TEXT,
+                description TEXT,
+                found_at DATETIME,
+                FOREIGN KEY (contact_id) REFERENCES contacts (id),
+                UNIQUE(contact_id)
+            )
+        `);
+
+        // Metadata table (NEW)
+        await this.dbRun(`
+            CREATE TABLE IF NOT EXISTS metadata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                keywords TEXT,
+                description TEXT,
+                language TEXT,
+                author TEXT,
+                found_at DATETIME,
+                FOREIGN KEY (contact_id) REFERENCES contacts (id),
+                UNIQUE(contact_id)
+            )
+        `);
+
+        // Business hours table (NEW)
+        await this.dbRun(`
+            CREATE TABLE IF NOT EXISTS business_hours (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                hours_text TEXT,
+                found_at DATETIME,
+                FOREIGN KEY (contact_id) REFERENCES contacts (id),
+                UNIQUE(contact_id)
+            )
+        `);
+
+        // Images table (NEW)
+        await this.dbRun(`
+            CREATE TABLE IF NOT EXISTS images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                logo_url TEXT,
+                image_url TEXT,
+                image_alt TEXT,
+                found_at DATETIME,
+                FOREIGN KEY (contact_id) REFERENCES contacts (id)
+            )
+        `);
+
         // Create indexes for better performance
         await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_contacts_url ON contacts (url)`);
         await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_contacts_domain ON contacts (domain)`);
         await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_emails_email ON emails (email)`);
         await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_phones_phone ON phones (phone)`);
         await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_names_name ON names (name)`);
+        await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_addresses_contact ON addresses (contact_id)`);
+        await this.dbRun(`CREATE INDEX IF NOT EXISTS idx_social_media_contact ON social_media (contact_id)`);
     }
 
     /**
@@ -195,6 +278,38 @@ export class DatabaseManager {
                 for (const nameObj of contactData.names) {
                     await this.storeName(contactId, nameObj);
                 }
+            }
+
+            // Store addresses
+            if (contactData.addresses && contactData.addresses.length > 0) {
+                for (const address of contactData.addresses) {
+                    await this.storeAddress(contactId, address);
+                }
+            }
+
+            // Store social media links
+            if (contactData.socialMedia && typeof contactData.socialMedia === 'object') {
+                await this.storeSocialMedia(contactId, contactData.socialMedia);
+            }
+
+            // Store company info
+            if (contactData.companyInfo && typeof contactData.companyInfo === 'object') {
+                await this.storeCompanyInfo(contactId, contactData.companyInfo);
+            }
+
+            // Store metadata
+            if (contactData.metadata && typeof contactData.metadata === 'object') {
+                await this.storeMetadata(contactId, contactData.metadata);
+            }
+
+            // Store business hours
+            if (contactData.businessHours && contactData.businessHours.found) {
+                await this.storeBusinessHours(contactId, contactData.businessHours);
+            }
+
+            // Store images
+            if (contactData.images) {
+                await this.storeImages(contactId, contactData.images);
             }
 
             return contactId;
@@ -297,26 +412,73 @@ export class DatabaseManager {
                     c.*,
                     GROUP_CONCAT(DISTINCT e.email) as emails,
                     GROUP_CONCAT(DISTINCT p.phone) as phones,
-                    GROUP_CONCAT(DISTINCT n.name) as names
+                    GROUP_CONCAT(DISTINCT n.name) as names,
+                    GROUP_CONCAT(DISTINCT a.address) as addresses
                 FROM contacts c
                 LEFT JOIN emails e ON c.id = e.contact_id
                 LEFT JOIN phones p ON c.id = p.contact_id
                 LEFT JOIN names n ON c.id = n.contact_id
+                LEFT JOIN addresses a ON c.id = a.contact_id
                 GROUP BY c.id
                 ORDER BY c.created_at DESC
             `);
 
-            // Format the results
-            return contacts.map(contact => ({
-                url: contact.url,
-                title: contact.title,
-                domain: contact.domain,
-                timestamp: contact.created_at,
-                method: contact.scrape_method,
-                emails: contact.emails ? contact.emails.split(',').filter(Boolean) : [],
-                phones: contact.phones ? contact.phones.split(',').filter(Boolean) : [],
-                names: contact.names ? contact.names.split(',').filter(Boolean) : []
-            }));
+            // Format the results with enriched data
+            const enrichedContacts = [];
+            for (const contact of contacts) {
+                // Get social media
+                const socialMedia = await this.dbAll(`
+                    SELECT platform, url FROM social_media WHERE contact_id = ?
+                `, [contact.id]);
+
+                // Get company info
+                const companyInfo = await this.dbGet(`
+                    SELECT * FROM company_info WHERE contact_id = ?
+                `, [contact.id]);
+
+                // Get metadata
+                const metadata = await this.dbGet(`
+                    SELECT * FROM metadata WHERE contact_id = ?
+                `, [contact.id]);
+
+                // Get business hours
+                const businessHours = await this.dbGet(`
+                    SELECT hours_text FROM business_hours WHERE contact_id = ?
+                `, [contact.id]);
+
+                // Get images
+                const images = await this.dbAll(`
+                    SELECT logo_url, image_url, image_alt FROM images WHERE contact_id = ?
+                `, [contact.id]);
+
+                enrichedContacts.push({
+                    url: contact.url,
+                    title: contact.title,
+                    domain: contact.domain,
+                    timestamp: contact.created_at,
+                    method: contact.scrape_method,
+                    emails: contact.emails ? contact.emails.split(',').filter(Boolean) : [],
+                    phones: contact.phones ? contact.phones.split(',').filter(Boolean) : [],
+                    names: contact.names ? contact.names.split(',').filter(Boolean) : [],
+                    addresses: contact.addresses ? contact.addresses.split(',').filter(Boolean) : [],
+                    socialMedia: socialMedia.reduce((acc, sm) => {
+                        acc[sm.platform] = sm.url;
+                        return acc;
+                    }, {}),
+                    companyInfo: companyInfo || {},
+                    metadata: metadata || {},
+                    businessHours: businessHours ? businessHours.hours_text : null,
+                    images: {
+                        logo: images.find(img => img.logo_url)?.logo_url || null,
+                        images: images.filter(img => img.image_url).map(img => ({
+                            url: img.image_url,
+                            alt: img.image_alt
+                        }))
+                    }
+                });
+            }
+
+            return enrichedContacts;
 
         } catch (error) {
             console.error('Error retrieving contact data:', error);
@@ -489,6 +651,174 @@ export class DatabaseManager {
             });
             this.db = null;
             this.isInitialized = false;
+        }
+    }
+
+    /**
+     * Store address data (NEW)
+     */
+    async storeAddress(contactId, address) {
+        try {
+            await this.dbRun(`
+                INSERT OR IGNORE INTO addresses (
+                    contact_id, address, type, found_at
+                ) VALUES (?, ?, ?, ?)
+            `, [
+                contactId,
+                typeof address === 'string' ? address : address.address,
+                typeof address === 'object' ? address.type : null,
+                new Date().toISOString()
+            ]);
+        } catch (error) {
+            if (!error.message.includes('UNIQUE constraint')) {
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * Store social media links (NEW)
+     */
+    async storeSocialMedia(contactId, socialMedia) {
+        try {
+            const platforms = ['facebook', 'twitter', 'linkedin', 'instagram', 'youtube', 'pinterest', 'tiktok'];
+            for (const platform of platforms) {
+                if (socialMedia[platform]) {
+                    await this.dbRun(`
+                        INSERT OR IGNORE INTO social_media (
+                            contact_id, platform, url, found_at
+                        ) VALUES (?, ?, ?, ?)
+                    `, [
+                        contactId,
+                        platform,
+                        socialMedia[platform],
+                        new Date().toISOString()
+                    ]);
+                }
+            }
+        } catch (error) {
+            if (!error.message.includes('UNIQUE constraint')) {
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * Store company information (NEW)
+     */
+    async storeCompanyInfo(contactId, companyInfo) {
+        try {
+            if (!companyInfo.companyName && !companyInfo.description && !companyInfo.industry && !companyInfo.foundedYear) {
+                return; // Don't store empty data
+            }
+
+            await this.dbRun(`
+                INSERT OR REPLACE INTO company_info (
+                    contact_id, company_name, industry, founded_year, description, found_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+                contactId,
+                companyInfo.companyName || null,
+                companyInfo.industry || null,
+                companyInfo.foundedYear || null,
+                companyInfo.description || null,
+                new Date().toISOString()
+            ]);
+        } catch (error) {
+            console.error('Error storing company info:', error);
+        }
+    }
+
+    /**
+     * Store metadata (NEW)
+     */
+    async storeMetadata(contactId, metadata) {
+        try {
+            if (!metadata.description && !metadata.keywords && !metadata.language && !metadata.author) {
+                return; // Don't store empty data
+            }
+
+            const keywords = Array.isArray(metadata.keywords) ? metadata.keywords.join(', ') : metadata.keywords;
+
+            await this.dbRun(`
+                INSERT OR REPLACE INTO metadata (
+                    contact_id, keywords, description, language, author, found_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            `, [
+                contactId,
+                keywords || null,
+                metadata.description || null,
+                metadata.language || null,
+                metadata.author || null,
+                new Date().toISOString()
+            ]);
+        } catch (error) {
+            console.error('Error storing metadata:', error);
+        }
+    }
+
+    /**
+     * Store business hours (NEW)
+     */
+    async storeBusinessHours(contactId, businessHours) {
+        try {
+            if (!businessHours.hours || businessHours.hours.length === 0) {
+                return;
+            }
+
+            const hoursText = Array.isArray(businessHours.hours) 
+                ? businessHours.hours.join('\n') 
+                : String(businessHours.hours);
+
+            await this.dbRun(`
+                INSERT OR REPLACE INTO business_hours (
+                    contact_id, hours_text, found_at
+                ) VALUES (?, ?, ?)
+            `, [
+                contactId,
+                hoursText,
+                new Date().toISOString()
+            ]);
+        } catch (error) {
+            console.error('Error storing business hours:', error);
+        }
+    }
+
+    /**
+     * Store images (NEW)
+     */
+    async storeImages(contactId, images) {
+        try {
+            // Store logo
+            if (images.logo) {
+                await this.dbRun(`
+                    INSERT INTO images (
+                        contact_id, logo_url, found_at
+                    ) VALUES (?, ?, ?)
+                `, [
+                    contactId,
+                    images.logo,
+                    new Date().toISOString()
+                ]);
+            }
+
+            // Store other images
+            if (images.images && Array.isArray(images.images)) {
+                for (const img of images.images.slice(0, 5)) {
+                    await this.dbRun(`
+                        INSERT INTO images (
+                            contact_id, image_url, image_alt, found_at
+                        ) VALUES (?, ?, ?, ?)
+                    `, [
+                        contactId,
+                        img.url || img,
+                        img.alt || null,
+                        new Date().toISOString()
+                    ]);
+                }
+            }
+        } catch (error) {
+            console.error('Error storing images:', error);
         }
     }
 }
