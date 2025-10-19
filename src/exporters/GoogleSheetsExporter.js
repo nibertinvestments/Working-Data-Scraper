@@ -103,6 +103,18 @@ export class GoogleSheetsExporter {
             'Email Addresses',
             'Phone Numbers',
             'Names',
+            'Addresses',
+            'Facebook',
+            'Twitter',
+            'LinkedIn',
+            'Instagram',
+            'Company Name',
+            'Industry',
+            'Founded Year',
+            'Description',
+            'Keywords',
+            'Business Hours',
+            'Logo URL',
             'Browser Used',
             'Scrape Method',
             'Confidence Score'
@@ -110,7 +122,7 @@ export class GoogleSheetsExporter {
 
         await this.sheets.spreadsheets.values.update({
             spreadsheetId: this.spreadsheetId,
-            range: `${sheetName}!A1:J1`,
+            range: `${sheetName}!A1:V1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: {
                 values: [headers]
@@ -128,7 +140,7 @@ export class GoogleSheetsExporter {
                             startRowIndex: 0,
                             endRowIndex: 1,
                             startColumnIndex: 0,
-                            endColumnIndex: 10
+                            endColumnIndex: 22
                         },
                         cell: {
                             userEnteredFormat: {
@@ -153,7 +165,7 @@ export class GoogleSheetsExporter {
         try {
             const response = await this.sheets.spreadsheets.values.get({
                 spreadsheetId: this.spreadsheetId,
-                range: `${sheetName}!A1:J1`
+                range: `${sheetName}!A1:V1`
             });
 
             if (!response.data.values || response.data.values.length === 0) {
@@ -188,7 +200,7 @@ export class GoogleSheetsExporter {
             const nextRow = await this.getNextEmptyRow(sheetName);
             
             // Write data
-            const range = `${sheetName}!A${nextRow}:J${nextRow + rows.length - 1}`;
+            const range = `${sheetName}!A${nextRow}:V${nextRow + rows.length - 1}`;
             
             await this.sheets.spreadsheets.values.update({
                 spreadsheetId: this.spreadsheetId,
@@ -228,7 +240,7 @@ export class GoogleSheetsExporter {
 
             await this.sheets.spreadsheets.values.append({
                 spreadsheetId: this.spreadsheetId,
-                range: `${sheetName}!A:J`,
+                range: `${sheetName}!A:V`,
                 valueInputOption: 'USER_ENTERED',
                 insertDataOption: 'INSERT_ROWS',
                 requestBody: {
@@ -260,6 +272,12 @@ export class GoogleSheetsExporter {
             ? (confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length)
             : 0.5;
 
+        // Format social media links
+        const socialMedia = contact.socialMedia || {};
+        const companyInfo = contact.companyInfo || {};
+        const metadata = contact.metadata || {};
+        const images = contact.images || {};
+
         return [
             new Date(contact.timestamp || Date.now()).toLocaleString(), // Timestamp
             contact.url || '', // Website URL
@@ -268,6 +286,18 @@ export class GoogleSheetsExporter {
             this.formatContactArray(contact.emails), // Email Addresses
             this.formatContactArray(contact.phones), // Phone Numbers
             this.formatContactArray(contact.names), // Names
+            this.formatContactArray(contact.addresses), // Addresses
+            socialMedia.facebook || '', // Facebook
+            socialMedia.twitter || '', // Twitter
+            socialMedia.linkedin || '', // LinkedIn
+            socialMedia.instagram || '', // Instagram
+            companyInfo.companyName || '', // Company Name
+            companyInfo.industry || '', // Industry
+            companyInfo.foundedYear || '', // Founded Year
+            (companyInfo.description || '').substring(0, 200), // Description (truncated)
+            Array.isArray(metadata.keywords) ? metadata.keywords.slice(0, 10).join(', ') : (metadata.keywords || ''), // Keywords
+            contact.businessHours || '', // Business Hours
+            images.logo || '', // Logo URL
             contact.browserInfo?.browser || 'Unknown', // Browser Used
             contact.method || 'Unknown', // Scrape Method
             Math.round(avgConfidence * 100) + '%' // Confidence Score
@@ -486,7 +516,7 @@ export class GoogleSheetsExporter {
             // Clear all data except headers
             await this.sheets.spreadsheets.values.clear({
                 spreadsheetId: this.spreadsheetId,
-                range: `${sheetName}!A2:J1000`
+                range: `${sheetName}!A2:V1000`
             });
 
             console.log('Cleared all data from Google Sheets');

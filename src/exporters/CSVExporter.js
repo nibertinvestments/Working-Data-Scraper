@@ -20,6 +20,18 @@ export class CSVExporter {
             { id: 'emails', title: 'Email Addresses' },
             { id: 'phones', title: 'Phone Numbers' },
             { id: 'names', title: 'Names' },
+            { id: 'addresses', title: 'Physical Addresses' },
+            { id: 'facebook', title: 'Facebook' },
+            { id: 'twitter', title: 'Twitter' },
+            { id: 'linkedin', title: 'LinkedIn' },
+            { id: 'instagram', title: 'Instagram' },
+            { id: 'companyName', title: 'Company Name' },
+            { id: 'industry', title: 'Industry' },
+            { id: 'foundedYear', title: 'Founded Year' },
+            { id: 'description', title: 'Description' },
+            { id: 'keywords', title: 'Keywords' },
+            { id: 'businessHours', title: 'Business Hours' },
+            { id: 'logo', title: 'Logo URL' },
             { id: 'browser', title: 'Browser Used' },
             { id: 'method', title: 'Scrape Method' },
             { id: 'confidence', title: 'Confidence Score' }
@@ -140,6 +152,11 @@ export class CSVExporter {
             ? (confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length)
             : 0.5;
 
+        const socialMedia = contact.socialMedia || {};
+        const companyInfo = contact.companyInfo || {};
+        const metadata = contact.metadata || {};
+        const images = contact.images || {};
+
         return {
             timestamp: new Date(contact.timestamp || Date.now()).toLocaleString(),
             url: contact.url || '',
@@ -148,6 +165,18 @@ export class CSVExporter {
             emails: this.formatContactArray(contact.emails),
             phones: this.formatContactArray(contact.phones),
             names: this.formatContactArray(contact.names),
+            addresses: this.formatContactArray(contact.addresses),
+            facebook: socialMedia.facebook || '',
+            twitter: socialMedia.twitter || '',
+            linkedin: socialMedia.linkedin || '',
+            instagram: socialMedia.instagram || '',
+            companyName: this.cleanText(companyInfo.companyName || ''),
+            industry: this.cleanText(companyInfo.industry || ''),
+            foundedYear: companyInfo.foundedYear || '',
+            description: this.cleanText((companyInfo.description || '').substring(0, 500)),
+            keywords: Array.isArray(metadata.keywords) ? metadata.keywords.slice(0, 10).join('; ') : (metadata.keywords || ''),
+            businessHours: this.cleanText(contact.businessHours || ''),
+            logo: images.logo || '',
             browser: contact.browserInfo?.browser || 'Unknown',
             method: contact.method || 'Unknown',
             confidence: Math.round(avgConfidence * 100) + '%'

@@ -202,7 +202,13 @@ export class WebScraper extends EventEmitter {
             method: rawData.method,
             emails: [],
             phones: [],
-            names: []
+            names: [],
+            addresses: [],
+            socialMedia: {},
+            companyInfo: {},
+            metadata: {},
+            businessHours: {},
+            images: {}
         };
 
         // Get targeted content sections for better extraction
@@ -223,6 +229,14 @@ export class WebScraper extends EventEmitter {
         if (this.config.extractNames) {
             result.names = this.extractNames(combinedText, rawData.content);
         }
+
+        // Extract new data types
+        result.addresses = this.extractAddresses(combinedText, rawData.content);
+        result.socialMedia = this.extractSocialMediaLinks(rawData.content);
+        result.companyInfo = this.extractCompanyInfo(combinedText, rawData.content);
+        result.metadata = this.extractWebsiteMetadata(rawData.content);
+        result.businessHours = this.extractBusinessHours(combinedText, rawData.content);
+        result.images = this.extractImages(rawData.content, rawData.url);
 
         // Apply comprehensive validation and filtering
         const validatedResult = this.validateExtractedData(result);
@@ -1573,6 +1587,24 @@ export class WebScraper extends EventEmitter {
             .slice(0, 5)
             .map(item => item.value);
         
+        // Validate addresses (already limited to 3)
+        validated.addresses = data.addresses || [];
+        
+        // Validate social media (keep as is)
+        validated.socialMedia = data.socialMedia || {};
+        
+        // Validate company info (keep as is)
+        validated.companyInfo = data.companyInfo || {};
+        
+        // Validate metadata (keep as is)
+        validated.metadata = data.metadata || {};
+        
+        // Validate business hours (keep as is)
+        validated.businessHours = data.businessHours || {};
+        
+        // Validate images (keep as is)
+        validated.images = data.images || {};
+        
         return validated;
     }
 
@@ -1721,5 +1753,357 @@ export class WebScraper extends EventEmitter {
      */
     getActiveScrapeCount() {
         return this.activeScrapes.size;
+    }
+
+    /**
+     * Extract physical addresses from text and HTML
+     */
+    extractAddresses(text, html = '') {
+        const addresses = new Set();
+        
+        // Common address patterns
+        const addressPatterns = [
+            // Street address with city, state, zip
+            /\b\d+\s+[\w\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Circle|Cir|Way|Place|Pl|Parkway|Pkwy)[,\s]+[\w\s]+[,\s]+[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/gi,
+            // PO Box addresses
+            /\bP\.?O\.?\s*Box\s+\d+[,\s]+[\w\s]+[,\s]+[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/gi,
+            // International format (simpler)
+            /\b\d+\s+[\w\s]+(Street|St|Avenue|Ave|Road|Rd)[,\s]+[\w\s]+[,\s]+[A-Z\d\s]{3,10}\b/gi
+        ];
+
+        addressPatterns.forEach(pattern => {
+            const matches = text.match(pattern) || [];
+            matches.forEach(address => {
+                const cleaned = address.trim();
+                if (cleaned.length >= 20 && cleaned.length <= 200) {
+                    addresses.add(cleaned);
+                }
+            });
+        });
+
+        // Extract from HTML address tags and microdata
+        if (html) {
+            const $ = cheerio.load(html);
+            
+            // Look for address tags
+            $('address').each((i, elem) => {
+                const addressText = $(elem).text().trim();
+                if (addressText.length >= 20 && addressText.length <= 200) {
+                    addresses.add(addressText);
+                }
+            });
+
+            // Look for schema.org address data
+            $('[itemprop="address"], [itemtype*="PostalAddress"]').each((i, elem) => {
+                const addressText = $(elem).text().trim();
+                if (addressText.length >= 20 && addressText.length <= 200) {
+                    addresses.add(addressText);
+                }
+            });
+        }
+
+        return Array.from(addresses).slice(0, 3);
+    }
+
+    /**
+     * Extract social media links from HTML
+     */
+    extractSocialMediaLinks(html) {
+        if (!html) return {};
+
+        const socialMedia = {
+            facebook: null,
+            twitter: null,
+            linkedin: null,
+            instagram: null,
+            youtube: null,
+            pinterest: null,
+            tiktok: null
+        };
+
+        const $ = cheerio.load(html);
+
+        // Extract from links
+        $('a[href]').each((i, elem) => {
+            const href = $(elem).attr('href');
+            if (!href) return;
+
+            const lowerHref = href.toLowerCase();
+            
+            if ((lowerHref.includes('facebook.com') || lowerHref.includes('fb.com')) && !socialMedia.facebook) {
+                socialMedia.facebook = href;
+            } else if ((lowerHref.includes('twitter.com') || lowerHref.includes('x.com')) && !socialMedia.twitter) {
+                socialMedia.twitter = href;
+            } else if (lowerHref.includes('linkedin.com') && !socialMedia.linkedin) {
+                socialMedia.linkedin = href;
+            } else if (lowerHref.includes('instagram.com') && !socialMedia.instagram) {
+                socialMedia.instagram = href;
+            } else if (lowerHref.includes('youtube.com') && !socialMedia.youtube) {
+                socialMedia.youtube = href;
+            } else if (lowerHref.includes('pinterest.com') && !socialMedia.pinterest) {
+                socialMedia.pinterest = href;
+            } else if (lowerHref.includes('tiktok.com') && !socialMedia.tiktok) {
+                socialMedia.tiktok = href;
+            }
+        });
+
+        return socialMedia;
+    }
+
+    /**
+     * Extract company/business information
+     */
+    extractCompanyInfo(text, html = '') {
+        const companyInfo = {
+            companyName: null,
+            industry: null,
+            foundedYear: null,
+            description: null
+        };
+
+        if (!html) return companyInfo;
+
+        const $ = cheerio.load(html);
+
+        // Try to get company name from various sources
+        // 1. Schema.org Organization
+        $('script[type="application/ld+json"]').each((i, elem) => {
+            try {
+                const jsonData = JSON.parse($(elem).html());
+                if (jsonData['@type'] === 'Organization' || jsonData['@type'] === 'Corporation') {
+                    if (jsonData.name && !companyInfo.companyName) {
+                        companyInfo.companyName = jsonData.name;
+                    }
+                    if (jsonData.description && !companyInfo.description) {
+                        companyInfo.description = jsonData.description.substring(0, 500);
+                    }
+                    if (jsonData.foundingDate && !companyInfo.foundedYear) {
+                        const year = jsonData.foundingDate.match(/\d{4}/);
+                        if (year) companyInfo.foundedYear = year[0];
+                    }
+                }
+            } catch (e) {
+                // Skip invalid JSON
+            }
+        });
+
+        // 2. Meta tags
+        const metaTags = [
+            'meta[property="og:site_name"]',
+            'meta[name="application-name"]',
+            'meta[name="apple-mobile-web-app-title"]',
+            'meta[property="og:description"]',
+            'meta[name="description"]'
+        ];
+
+        metaTags.forEach(selector => {
+            const content = $(selector).attr('content');
+            if (content) {
+                if (selector.includes('site_name') || selector.includes('application-name')) {
+                    if (!companyInfo.companyName) companyInfo.companyName = content;
+                } else if (selector.includes('description')) {
+                    if (!companyInfo.description) companyInfo.description = content.substring(0, 500);
+                }
+            }
+        });
+
+        // 3. Look for "Founded in" patterns in text
+        if (!companyInfo.foundedYear) {
+            const yearPatterns = [
+                /founded in (\d{4})/i,
+                /established (\d{4})/i,
+                /since (\d{4})/i,
+                /est\.?\s*(\d{4})/i
+            ];
+
+            yearPatterns.forEach(pattern => {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    const year = parseInt(match[1]);
+                    if (year >= 1800 && year <= new Date().getFullYear()) {
+                        companyInfo.foundedYear = match[1];
+                    }
+                }
+            });
+        }
+
+        return companyInfo;
+    }
+
+    /**
+     * Extract website metadata (keywords, description, language)
+     */
+    extractWebsiteMetadata(html) {
+        if (!html) return {};
+
+        const metadata = {
+            keywords: [],
+            description: null,
+            language: null,
+            author: null
+        };
+
+        const $ = cheerio.load(html);
+
+        // Extract keywords
+        const keywordsContent = $('meta[name="keywords"]').attr('content');
+        if (keywordsContent) {
+            metadata.keywords = keywordsContent.split(',').map(k => k.trim()).filter(k => k.length > 0).slice(0, 20);
+        }
+
+        // Extract description
+        const descContent = $('meta[name="description"]').attr('content') || 
+                           $('meta[property="og:description"]').attr('content');
+        if (descContent) {
+            metadata.description = descContent.substring(0, 500);
+        }
+
+        // Extract language
+        const htmlLang = $('html').attr('lang');
+        const metaLang = $('meta[http-equiv="content-language"]').attr('content');
+        metadata.language = htmlLang || metaLang || 'en';
+
+        // Extract author
+        const authorContent = $('meta[name="author"]').attr('content');
+        if (authorContent) {
+            metadata.author = authorContent;
+        }
+
+        return metadata;
+    }
+
+    /**
+     * Extract business hours if available
+     */
+    extractBusinessHours(text, html = '') {
+        const hours = {
+            found: false,
+            hours: []
+        };
+
+        // Common hour patterns
+        const hourPatterns = [
+            /(?:Monday|Mon|M):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi,
+            /(?:Tuesday|Tue|Tu):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi,
+            /(?:Wednesday|Wed|W):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi,
+            /(?:Thursday|Thu|Th):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi,
+            /(?:Friday|Fri|F):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi,
+            /(?:Saturday|Sat|Sa):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi,
+            /(?:Sunday|Sun|Su):?\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/gi
+        ];
+
+        const foundHours = [];
+        hourPatterns.forEach(pattern => {
+            const matches = text.match(pattern) || [];
+            matches.forEach(match => {
+                foundHours.push(match.trim());
+            });
+        });
+
+        if (foundHours.length > 0) {
+            hours.found = true;
+            hours.hours = foundHours.slice(0, 7); // Max one entry per day
+        }
+
+        // Also check for schema.org OpeningHoursSpecification
+        if (html) {
+            const $ = cheerio.load(html);
+            $('script[type="application/ld+json"]').each((i, elem) => {
+                try {
+                    const jsonData = JSON.parse($(elem).html());
+                    if (jsonData.openingHoursSpecification || jsonData.openingHours) {
+                        hours.found = true;
+                        const hoursSpec = jsonData.openingHoursSpecification || jsonData.openingHours;
+                        if (typeof hoursSpec === 'string') {
+                            hours.hours = [hoursSpec];
+                        } else if (Array.isArray(hoursSpec)) {
+                            hours.hours = hoursSpec.map(h => {
+                                if (typeof h === 'string') return h;
+                                if (h.dayOfWeek && h.opens && h.closes) {
+                                    return `${h.dayOfWeek}: ${h.opens} - ${h.closes}`;
+                                }
+                                return JSON.stringify(h);
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // Skip invalid JSON
+                }
+            });
+        }
+
+        return hours;
+    }
+
+    /**
+     * Extract images (logo and key images)
+     */
+    extractImages(html, pageUrl) {
+        if (!html) return { logo: null, images: [] };
+
+        const images = {
+            logo: null,
+            images: []
+        };
+
+        const $ = cheerio.load(html);
+
+        // Try to find logo
+        const logoSelectors = [
+            'img[class*="logo" i]',
+            'img[id*="logo" i]',
+            'a[class*="logo" i] img',
+            'a[id*="logo" i] img',
+            '.logo img',
+            '#logo img',
+            'img[alt*="logo" i]',
+            'link[rel="icon"]',
+            'link[rel="shortcut icon"]',
+            'meta[property="og:image"]'
+        ];
+
+        for (const selector of logoSelectors) {
+            let logoUrl = null;
+            
+            if (selector.startsWith('link') || selector.startsWith('meta')) {
+                logoUrl = $(selector).attr('href') || $(selector).attr('content');
+            } else {
+                logoUrl = $(selector).first().attr('src');
+            }
+
+            if (logoUrl) {
+                // Make absolute URL
+                try {
+                    images.logo = new URL(logoUrl, pageUrl).href;
+                    break;
+                } catch (e) {
+                    // Skip invalid URLs
+                }
+            }
+        }
+
+        // Extract other prominent images (limit to top 5)
+        const imageElements = $('img[src]').slice(0, 20);
+        imageElements.each((i, elem) => {
+            const src = $(elem).attr('src');
+            const alt = $(elem).attr('alt') || '';
+            
+            if (src && images.images.length < 5) {
+                try {
+                    const absoluteUrl = new URL(src, pageUrl).href;
+                    // Skip small images, icons, and tracking pixels
+                    if (!src.includes('1x1') && !src.includes('icon') && !src.includes('pixel')) {
+                        images.images.push({
+                            url: absoluteUrl,
+                            alt: alt
+                        });
+                    }
+                } catch (e) {
+                    // Skip invalid URLs
+                }
+            }
+        });
+
+        return images;
     }
 }
